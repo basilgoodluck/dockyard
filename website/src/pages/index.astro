@@ -1,0 +1,24 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="Dockyard">
+  <main class="min-h-screen w-full bg-yellow-400 flex flex-col justify-center items-start px-8">
+    <div class="max-w-3xl mx-auto w-full">
+      <pre class="font-mono text-neutral-950 text-sm mb-6">$ dockyard ps --all</pre>
+
+      <h1 class="font-mono font-semibold text-neutral-950 text-4xl md:text-5xl leading-tight mb-5">
+        Manage every Docker box you SSH into.<br />From one terminal.
+      </h1>
+
+      <p class="text-neutral-800 text-lg max-w-md mb-8">
+        No agent. No dashboard. No server-side anything. Just your existing SSH keys.
+      </p>
+
+      <div class="bg-neutral-950 border-l-4 border-l-neutral-950 px-5 py-3 mb-8">
+        <code class="font-mono text-yellow-400 text-sm">curl -sSL https://dockyard.sh/install | sh</code>
+      </div>
+
+      <a href="https://github.com/basilgoodluck/dockyard" class="font-mono font-semibold text-yellow-400 bg-neutral-950 hover:bg-neutral-800 px-6 py-3 text-sm">View on GitHub →</a>
+    </div>
+  </main>
+</Base>
