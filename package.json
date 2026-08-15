@@ -1,0 +1,35 @@
+{
+  "name": "dockyard",
+  "version": "1.0.0",
+  "description": "A local CLI tool for managing Docker containers and Compose stacks across\r multiple, unrelated VPS servers — regardless of provider (Linode, Contabo,\r DigitalOcean, etc). No agent, no bot, no hosted service. Runs entirely on\r the user's own machine using their existing SSH access.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/basilgoodluck/dockyard.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/basilgoodluck/dockyard/issues"
+  },
+  "homepage": "https://github.com/basilgoodluck/dockyard#readme",
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^26.2.0",
+    "tsc-alias": "^1.9.1",
+    "tsx": "^4.23.11"
+  },
+  "dependencies": {
+    "chalk": "^6.0.0",
+    "cli-table3": "^0.6.5",
+    "commander": "^15.0.0",
+    "execa": "^10.0.1",
+    "js-yaml": "^5.2.3",
+    "zod": "^4.4.3"
+  }
+}

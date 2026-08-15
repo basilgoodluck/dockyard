@@ -70,8 +70,13 @@ stacks:
 | `dockyard start <container> --host <name>` | Start a container |
 | `dockyard stop <container> --host <name>` | Stop a container |
 | `dockyard restart <container> --host <name>` | Restart a container |
-| `dockyard logs <container> --host <name> [--tail N] [--since]` | Fetch logs |
+| `dockyard logs <container> --host <name> [--tail N] [--since] [-f/--follow]` | Fetch/tail logs |
 | `dockyard inspect <container> --host <name>` | Show container details |
+| `dockyard exec <container> --host <name> -- <cmd>` | Run a command inside a running container |
+| `dockyard prune <name\|--all>` | Remove dangling images/containers/volumes |
+
+All read commands (`ps`, `stats`, `logs`, `inspect`) support a `--json`
+flag for scriptable/pipeable output, not just human-readable tables.
 
 ### Stacks (Compose)
 | Command | Description |
@@ -82,6 +87,14 @@ stacks:
 | `dockyard stack down <name>` | `docker compose down` |
 | `dockyard stack restart <name>` | Restart a stack |
 | `dockyard stack logs <name> [--tail N]` | Fetch stack logs |
+
+### Utility
+| Command | Description |
+|---|---|
+| `dockyard config edit` | Open config file in `$EDITOR` |
+| `dockyard config path` | Print path to the config file |
+| `dockyard doctor` | Check local SSH setup, remote Docker install/version, connectivity per server |
+| `dockyard version` / `dockyard --version` | Print tool version |
 
 ### Fleet-wide (the actual value-add)
 | Command | Description |
@@ -100,13 +113,140 @@ stacks:
 
 ## Implementation notes
 
-- **Language:** Python
-- **CLI framework:** `typer` (subcommands, help text, flags)
-- **Docker connection:** `docker` SDK (`docker-py`) via `ssh://user@host`
-  base URL — reuses local SSH config/agent, no custom auth code
-- **Compose commands:** run via SSH exec (`subprocess`/`paramiko`), since
-  Compose is CLI-oriented rather than API-oriented
-- **Fan-out:** `concurrent.futures.ThreadPoolExecutor` for parallel SSH
-  calls across servers (`--all` flag)
-- **Packaging:** PyInstaller/Nuitka per-OS binaries built in CI, attached
-  to GitHub Releases; optional PyPI publish for `pip install` users
+- **Language:** TypeScript (Node.js)
+- **CLI framework:** `commander` or `oclif` (subcommands, help text, flags)
+- **Docker connection:** `dockerode` via `ssh://user@host` base URL —
+  reuses local SSH config/agent, no custom auth code
+- **Compose commands:** run via SSH exec (`ssh2` or shelling out to
+  system `ssh`), since Compose is CLI-oriented rather than API-oriented
+- **Fan-out:** `Promise.all` / a small concurrency-limited pool for
+  parallel SSH calls across servers (`--all` flag)
+- **Packaging:** Node single executable apps (`--experimental-sea`) or
+  `pkg`, per-OS binaries built in CI, attached to GitHub Releases;
+  optional npm publish for `npm install -g dockyard` users
+
+## Architecture — the layers you're actually building
+
+Six layers, roughly bottom-up. Each is a discrete, buildable chunk —
+useful for sequencing the work.
+
+**1. Transport layer (SSH)**
+The foundation everything else sits on. Responsible for: opening SSH
+connections using the user's existing keys/config, verifying host keys,
+running remote commands, streaming stdout/stderr back, and handling
+connection failures/timeouts cleanly. Built with `ssh2` (or shelling out
+to the system `ssh` binary — simpler to start, less control).
+
+**2. Docker API layer**
+Sits on top of the transport. Uses `dockerode` pointed at
+`ssh://user@host` to talk to the remote Docker daemon over the tunnel
+the transport layer opened. This is what gives you container list,
+start/stop/restart, inspect, logs — all as structured JSON responses
+rather than parsed CLI text.
+
+**3. Compose exec layer**
+A thinner layer, separate from the Docker API layer, because Compose
+itself isn't API-driven. Runs `docker compose up/down/restart/logs` as
+remote shell commands via the transport layer, in the stack's configured
+directory. Captures output, exit codes.
+
+**4. Config & state layer**
+Reads/writes `~/.dockyard/config.yaml` (or OS-appropriate path via an
+XDG-style resolver). Defines the schema for servers and stacks, validates
+it on load, and is the single source of truth every other layer reads
+from. No network calls happen here — pure local file I/O.
+
+**5. Orchestration / fan-out layer**
+Where the actual value-add lives. Takes a command (e.g. `ps --all`),
+resolves it against the config to a list of target servers, dispatches
+to layers 2/3 in parallel with a concurrency cap, collects results
+(including partial failures — one dead server shouldn't kill the whole
+batch), and merges/sorts output (e.g. interleaving logs by timestamp
+across hosts).
+
+**6. CLI / presentation layer**
+The `commander`/`oclif` command tree, flag parsing, help text, and
+output formatting (tables, colorized status, `--json` for scripting).
+This is the only layer that talks to `stdout` directly — everything
+below it returns structured data, not printed text, so output format
+can change without touching logic.
+
+```
+┌─────────────────────────────┐
+│ 6. CLI / presentation        │  commander/oclif, tables, --json
+├─────────────────────────────┤
+│ 5. Orchestration / fan-out    │  parallel dispatch, merge results
+├─────────────────────────────┤
+│ 4. Config & state             │  ~/.dockyard/config.yaml
+├───────────────┬───────────────┤
+│ 2. Docker API  │ 3. Compose exec │  dockerode        │ ssh exec
+├───────────────┴───────────────┤
+│ 1. Transport (SSH)             │  ssh2 / system ssh
+└─────────────────────────────┘
+```
+
+## Build order (suggested)
+
+1. Transport layer — get a raw SSH command running on a remote box from
+   your local machine, output captured correctly
+2. Config layer — load/validate a hardcoded `config.yaml`, no CLI yet
+3. Docker API layer — `dockerode` over `ssh://`, get `docker ps`
+   equivalent working for one server
+4. CLI layer (thin) — wire `dockyard ps <server>` end to end for a
+   single server, prove the whole vertical slice works
+5. Compose exec layer — `stack up`/`down`/`logs` for one server
+6. Orchestration layer — add `--all`, parallelize, handle partial
+   failures
+7. Packaging — binary build + install script, once functionality is
+   stable enough to be worth distributing
+
+
+dockyard/
+├── src/
+│   ├── cli/                     # Layer 6: CLI / presentation
+│   │   ├── index.ts             # entrypoint, registers all commands
+│   │   └── commands/
+│   │       ├── server.ts        # server add/list/remove/test/stats
+│   │       ├── container.ts     # ps/start/stop/restart/logs/inspect/exec/prune
+│   │       ├── stack.ts         # stack add/list/up/down/restart/logs
+│   │       ├── fleet.ts         # ps --all, logs --all, stats --all, drift
+│   │       └── utility.ts       # config, doctor, version
+│   │
+│   ├── orchestration/           # Layer 5: fan-out
+│   │   ├── dispatch.ts          # resolves target servers, runs in parallel
+│   │   └── merge.ts             # interleaves/sorts results (e.g. logs by timestamp)
+│   │
+│   ├── config/                  # Layer 4: config & state
+│   │   ├── schema.ts            # zod/io-ts schema for config.yaml
+│   │   ├── load.ts              # read + validate config
+│   │   ├── paths.ts             # OS-appropriate config path resolver (XDG-style)
+│   │   └── write.ts             # save config back to disk
+│   │
+│   ├── docker/                  # Layer 2: Docker API
+│   │   └── client.ts            # dockerode wrapper, ssh:// connection factory
+│   │
+│   ├── compose/                 # Layer 3: Compose exec
+│   │   └── exec.ts              # runs `docker compose ...` remotely via SSH
+│   │
+│   ├── transport/                # Layer 1: SSH
+│   │   ├── ssh.ts                # connection handling, host key verification
+│   │   └── exec-remote.ts        # run arbitrary remote command, stream output
+│   │
+│   └── types/
+│       └── index.ts              # shared TS types (Server, Stack, CommandResult, etc)
+│
+├── scripts/
+│   ├── install.sh                 # unix installer
+│   └── install.ps1                # windows installer
+│
+├── .github/
+│   └── workflows/
+│       ├── build.yml              # build binaries per OS
+│       └── release.yml            # cut GitHub release, attach binaries
+│
+├── test/
+│   └── ...                        # mirrors src/ structure
+│
+├── package.json
+├── tsconfig.json
+└── README.md
