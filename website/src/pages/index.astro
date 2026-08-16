@@ -14,55 +14,72 @@ import Base from '../layouts/Base.astro';
         No agent. No dashboard. No server-side anything. Just your existing SSH keys.
       </p>
 
-      <div class="install-box mb-8">
-        <code class="font-mono text-yellow-400 text-sm typewriter">curl -sSL https://dockyard.sh/install | sh</code>
+      <div class="install-box mb-6">
+        <code class="font-mono text-yellow-400 text-sm install-text">
+          <span class="typewriter">curl -sSL https://dockyard.sh/install | sh</span>
+        </code>
+        <button class="copy-btn" id="copyBtn" data-command="curl -sSL https://dockyard.sh/install | sh">Copy</button>
       </div>
 
-      <a href="https://dockyard.sh" class="github-btn font-mono font-semibold text-yellow-400 text-sm">View on GitHub →</a>
+      <div>
+        <a href="https://github.com/basilgoodluck/dockyard" class="github-btn font-mono font-semibold text-yellow-400 text-sm">View on GitHub →</a>
+      </div>
     </div>
   </main>
 </Base>
 
+<script>
+  const btn = document.getElementById('copyBtn');
+
+  btn?.addEventListener('click', async () => {
+    const command = btn.getAttribute('data-command') || '';
+    await navigator.clipboard.writeText(command);
+    btn.textContent = 'Copied';
+    setTimeout(() => {
+      btn.textContent = 'Copy';
+    }, 1500);
+  });
+</script>
+
 <style>
   .install-box {
-    display: inline-block;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    width: 420px;
+    max-width: 100%;
     background: #0a0a0a;
     padding: 0.9rem 1.4rem;
     border-radius: 0.6rem;
     box-shadow:
-      inset 0 3px 6px rgba(0, 0, 0, 0.6),
-      inset 0 -2px 4px rgba(255, 255, 255, 0.05);
+      inset 0 4px 8px rgba(0, 0, 0, 0.7),
+      inset 0 -3px 6px rgba(255, 255, 255, 0.06),
+      inset 3px 0 6px rgba(0, 0, 0, 0.5),
+      inset -3px 0 6px rgba(0, 0, 0, 0.5);
   }
 
-  .github-btn {
-    display: inline-block;
-    background: radial-gradient(
-      circle at 50% 25%,
-      #262626 0%,
-      #171717 40%,
-      #0a0a0a 100%
-    );
-    padding: 0.9rem 1.6rem;
-    border: 2px solid #171717;
-    border-radius: 0.6rem;
-    text-decoration: none;
-    box-shadow:
-      inset 0 2px 3px rgba(255, 255, 255, 0.15),
-      inset 0 -6px 10px rgba(0, 0, 0, 0.5),
-      0 8px 18px rgba(0, 0, 0, 0.3);
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  .install-text {
+    flex: 1;
+    overflow: hidden;
   }
 
-  .github-btn:hover {
-    transform: translateY(-2px);
+  .copy-btn {
+    flex-shrink: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    background: transparent;
+    border: 1px solid #404040;
+    border-radius: 0.4rem;
+    color: #a3a3a3;
+    padding: 0.4rem 0.7rem;
+    cursor: pointer;
+    transition: color 0.2s ease, border-color 0.2s ease;
   }
 
-  .github-btn:active {
-    transform: translateY(2px);
-    box-shadow:
-      inset 0 4px 8px rgba(0, 0, 0, 0.5),
-      inset 0 -2px 4px rgba(255, 255, 255, 0.1),
-      0 4px 10px rgba(0, 0, 0, 0.25);
+  .copy-btn:hover {
+    color: #f5c518;
+    border-color: #f5c518;
   }
 
   .typewriter {
@@ -72,16 +89,52 @@ import Base from '../layouts/Base.astro';
     border-right: 2px solid #f5c518;
     width: 0;
     animation:
-      typing 2.5s steps(38, end) forwards,
+      typing 4s steps(38, end) infinite,
       blink 0.75s step-end infinite;
   }
 
   @keyframes typing {
-    from { width: 0; }
-    to { width: 38ch; }
+    0%, 5% { width: 0; }
+    40%, 60% { width: 38ch; }
+    95%, 100% { width: 0; }
   }
 
   @keyframes blink {
     50% { border-color: transparent; }
+  }
+
+  .github-btn {
+    display: inline-block;
+    background: radial-gradient(
+      circle at 50% 25%,
+      #3a3a3a 0%,
+      #1a1a1a 45%,
+      #0a0a0a 100%
+    );
+    padding: 0.9rem 1.8rem;
+    border: 2px solid #262626;
+    border-radius: 0.6rem;
+    text-decoration: none;
+    box-shadow:
+      inset 0 3px 4px rgba(255, 255, 255, 0.2),
+      inset 0 -8px 12px rgba(0, 0, 0, 0.6),
+      0 12px 24px rgba(0, 0, 0, 0.4);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .github-btn:hover {
+    transform: translateY(-3px);
+    box-shadow:
+      inset 0 3px 4px rgba(255, 255, 255, 0.2),
+      inset 0 -8px 12px rgba(0, 0, 0, 0.6),
+      0 16px 28px rgba(0, 0, 0, 0.45);
+  }
+
+  .github-btn:active {
+    transform: translateY(2px);
+    box-shadow:
+      inset 0 5px 10px rgba(0, 0, 0, 0.6),
+      inset 0 -2px 4px rgba(255, 255, 255, 0.1),
+      0 4px 10px rgba(0, 0, 0, 0.3);
   }
 </style>
